@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <cstdlib>
 #include <vector>
+#include <optional>
 
 // initially made using Vulkan v1.3.231.1
 // following this tutorial: https://vulkan-tutorial.com/Introduction
@@ -62,6 +63,7 @@ private:
 	GLFWwindow* window;
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debugMessenger;
+	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 
 	void initWindow()
 	{
@@ -77,8 +79,10 @@ private:
 	{
 		createInstance();
 		setupDebugMessenger();
+		pickPhysicalDevice();
 	}
 
+#pragma region Instance setup
 	void createInstance()
 	{
 		if (enableValidationLayers && !checkValidationLayerSupport()) {
@@ -136,7 +140,6 @@ private:
 	//TODO: check if variable extensions are supported (supported likely variable as well)
 	bool checkIfExtensionsAreSupported(const char** extensionNames, const std::vector<VkExtensionProperties> supported)
 	{
-
 	}
 
 	bool checkValidationLayerSupport()
@@ -179,7 +182,9 @@ private:
 
 		return extensions;
 	}
+#pragma endregion
 
+#pragma region Debugging
 	void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
 	{
 		createInfo = {};
@@ -200,6 +205,61 @@ private:
 		if (CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
 			throw std::runtime_error("failed to set up the debug messenger");
 		}
+	}
+#pragma endregion
+
+	void pickPhysicalDevice()
+	{
+		uint32_t deviceCount = 0;
+		vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+
+		if (deviceCount == 0) {
+			throw std::runtime_error("failed to find GPUs with Vulkan support");
+		}
+
+		std::vector<VkPhysicalDevice> devices(deviceCount);
+		vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+
+		for (const auto& device : devices) {
+			if (isDeviceSuitable(device)) {
+				physicalDevice = device;
+				break;
+			}
+		}
+
+		if (physicalDevice == VK_NULL_HANDLE) {
+			throw std::runtime_error("failed to find a suitable GPU");
+		}
+	}
+
+	bool isDeviceSuitable(VkPhysicalDevice device)
+	{
+		//TODO: swap to score-based system to select a GPU
+		//VkPhysicalDeviceProperties deviceProperties;
+		//vkGetPhysicalDeviceProperties(device, &deviceProperties);
+
+		//VkPhysicalDeviceFeatures deviceFeatures;
+		//vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+
+		return true;
+	}
+
+	struct QueueFamilyIndices
+	{
+		std::optional<uint32_t> graphicsFamily;
+	};
+
+	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device)
+	{
+		QueueFamilyIndices indices;
+
+		uint32_t queueFamilyCount = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+		std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+		return indices;
 	}
 
 	void mainLoop()
