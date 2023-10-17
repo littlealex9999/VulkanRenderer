@@ -19,20 +19,15 @@ public:
 		end = std::chrono::high_resolution_clock::now();
 	}
 
-	std::chrono::high_resolution_clock::duration current()
+	double Current()
 	{
 		if (runOnce) {
 			if (running) {
-				return end - start;
+				return std::chrono::duration<double, std::chrono::seconds::period>(end - start).count();
 			} else {
-				return std::chrono::high_resolution_clock::now() - start;
+				return std::chrono::duration<double, std::chrono::seconds::period>(std::chrono::high_resolution_clock::now() - start).count();
 			}
 		}
-	}
-
-	double toDouble(std::chrono::high_resolution_clock::duration duration)
-	{
-		return duration.count() / 1000000000.0;
 	}
 
 private:
