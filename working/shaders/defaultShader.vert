@@ -4,6 +4,7 @@ layout(binding = 0) uniform UniformBufferObject {
 	mat4 model;
 	mat4 view;
 	mat4 proj;
+	vec2 frameSize;
 } mvp;
 
 layout(location = 0) in vec3 inPosition;
@@ -17,6 +18,7 @@ layout(location = 1) out vec3 fragNormal;
 layout(location = 2) out vec3 fragTangent;
 layout(location = 3) out mat3 TBN;
 layout(location = 6) out vec2 fragTexCoord;
+layout(location = 7) out vec2 frameSize;
 
 void main()
 {
@@ -25,6 +27,7 @@ void main()
 	fragNormal = (mvp.model * vec4(inNormal, 0)).xyz;
 	fragTangent = inTangent;
 	fragTexCoord = inTexCoord;
+	frameSize = mvp.frameSize;
 
 	TBN[0] = vec3(-inTangent);
 	TBN[1] = vec3(cross(fragNormal, inTangent));

@@ -40,7 +40,9 @@
 #include "Mesh.h"
 #include "Texture.h"
 #include "Stopwatch.h"
+#include "UniformBuffer.h"
 #include "UniformBufferObject.h"
+#include "LightSource.h"
 #include "Constants.h"
 
 // initially made using Vulkan v1.3.231.1
@@ -112,9 +114,8 @@ private:
 
 	std::vector<Mesh> meshes;
 
-	std::vector<VkBuffer> uniformBuffers;
-	std::vector<VkDeviceMemory> uniformBuffersMemory;
-	std::vector<void*> uniformBuffersMapped;
+	UniformBuffer uniformBufferObject;
+	UniformBuffer lightUniformBuffer;
 	VkDescriptorPool descriptorPool;
 	std::vector<VkDescriptorSet> descriptorSets;
 
@@ -974,7 +975,14 @@ private:
 		roughnessSamplerLayoutBinding.pImmutableSamplers = nullptr;
 		roughnessSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-		std::array<VkDescriptorSetLayoutBinding, 7> bindings = { uboLayoutBinding, baseColorSamplerLayoutBinding, emissiveSamplerLayoutBinding, heightSamplerLayoutBinding, metallicSamplerLayoutBinding, normalSamplerLayoutBinding, roughnessSamplerLayoutBinding };
+		VkDescriptorSetLayoutBinding lightLayoutBinding {};
+		lightLayoutBinding.binding = 7;
+		lightLayoutBinding.descriptorCount = 1;
+		lightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		lightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		lightLayoutBinding.pImmutableSamplers = nullptr;
+
+		std::array<VkDescriptorSetLayoutBinding, 8> bindings = { uboLayoutBinding, baseColorSamplerLayoutBinding, emissiveSamplerLayoutBinding, heightSamplerLayoutBinding, metallicSamplerLayoutBinding, normalSamplerLayoutBinding, roughnessSamplerLayoutBinding, lightLayoutBinding };
 		VkDescriptorSetLayoutCreateInfo layoutInfo{};
 		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
@@ -1158,24 +1166,26 @@ private:
 
 	void createUniformBuffers()
 	{
-		VkDeviceSize size = sizeof(UniformBufferObject);
+		createUniformBuffers(uniformBufferObject, sizeof(UniformBufferObject));
+		createUniformBuffers(lightUniformBuffer, sizeof(LightSource));
+	}
 
-		uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-		uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
-		uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+	void createUniformBuffers(UniformBuffer& ub, VkDeviceSize size)
+	{
+		ub.Resize(MAX_FRAMES_IN_FLIGHT);
 
 		VkBufferUsageFlags usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		VkMemoryPropertyFlags properties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-			createBuffer(size, usage, properties, uniformBuffers[i], uniformBuffersMemory[i]);
+			createBuffer(size, usage, properties, ub.uniformBuffers[i], ub.uniformBuffersMemory[i]);
 
-			vkMapMemory(device, uniformBuffersMemory[i], 0, size, 0, &uniformBuffersMapped[i]);
+			vkMapMemory(device, ub.uniformBuffersMemory[i], 0, size, 0, &ub.uniformBuffersMapped[i]);
 		}
 	}
 
 	void createDescriptorPool()
 	{
-		std::array<VkDescriptorPoolSize, 7> poolSizes{};
+		std::array<VkDescriptorPoolSize, 8> poolSizes{};
 		poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 		poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -1190,6 +1200,8 @@ private:
 		poolSizes[5].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 		poolSizes[6].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		poolSizes[6].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+		poolSizes[7].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		poolSizes[7].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
 		VkDescriptorPoolCreateInfo poolInfo{};
 		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1218,9 +1230,14 @@ private:
 
 		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 			VkDescriptorBufferInfo bufferInfo{};
-			bufferInfo.buffer = uniformBuffers[i];
+			bufferInfo.buffer = uniformBufferObject.uniformBuffers[i];
 			bufferInfo.offset = 0;
 			bufferInfo.range = sizeof(UniformBufferObject);
+
+			VkDescriptorBufferInfo lightInfo {};
+			lightInfo.buffer = lightUniformBuffer.uniformBuffers[i];
+			lightInfo.offset = 0;
+			lightInfo.range = sizeof(LightSource);
 
 			VkDescriptorImageInfo baseColorImageInfo{};
 			baseColorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -1252,7 +1269,7 @@ private:
 			roughnessImageInfo.imageView = roughnessTex.imageView;
 			roughnessImageInfo.sampler = textureSampler;
 
-			std::array<VkWriteDescriptorSet, 7> descriptorWrites{};
+			std::array<VkWriteDescriptorSet, 8> descriptorWrites{};
 			descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 			descriptorWrites[0].dstSet = descriptorSets[i];
 			descriptorWrites[0].dstBinding = 0;
@@ -1308,6 +1325,14 @@ private:
 			descriptorWrites[6].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			descriptorWrites[6].descriptorCount = 1;
 			descriptorWrites[6].pImageInfo = &roughnessImageInfo;
+
+			descriptorWrites[7].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			descriptorWrites[7].dstSet = descriptorSets[i];
+			descriptorWrites[7].dstBinding = 7;
+			descriptorWrites[7].dstArrayElement = 0;
+			descriptorWrites[7].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			descriptorWrites[7].descriptorCount = 1;
+			descriptorWrites[7].pBufferInfo = &lightInfo;
 
 			vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 		}
@@ -1842,8 +1867,14 @@ private:
 		ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 		ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
 		ubo.proj[1][1] *= -1;
+		ubo.frameSize = glm::vec2(swapChainExtent.width, swapChainExtent.height);
 
-		memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+		memcpy(uniformBufferObject.uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+
+		LightSource light {};
+		light.direction = glm::vec3(1.0f, 1.0f, 1.0f);
+
+		memcpy(lightUniformBuffer.uniformBuffersMapped[currentImage], &light, sizeof(light));
 	}
 #pragma endregion
 
@@ -1860,10 +1891,8 @@ private:
 		normalTex.Cleanup(device);
 		roughnessTex.Cleanup(device);
 
-		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-			vkDestroyBuffer(device, uniformBuffers[i], nullptr);
-			vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
-		}
+		uniformBufferObject.Cleanup(device, MAX_FRAMES_IN_FLIGHT);
+		lightUniformBuffer.Cleanup(device, MAX_FRAMES_IN_FLIGHT);
 
 		vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 
