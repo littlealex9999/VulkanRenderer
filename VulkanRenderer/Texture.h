@@ -4,8 +4,9 @@
 class Texture
 {
 public:
+	VkImage image;
+	VkDeviceMemory imageMemory;
+	VkImageView imageView;
 
-private:
-	VkImage textureImage;
-	VkDeviceMemory textureImageMemory;
+	void Cleanup(VkDevice device);
 };
