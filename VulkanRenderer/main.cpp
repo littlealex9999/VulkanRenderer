@@ -37,6 +37,7 @@
 #include <unordered_map>
 
 #include "Vertex.h"
+#include "Mesh.h"
 #include "Stopwatch.h"
 #include "UniformBufferObject.h"
 
@@ -1576,6 +1577,11 @@ private:
 #pragma region Models
 	void loadModel()
 	{
+		//Mesh loadedMesh = LoadModel(MODEL_PATH);
+		//
+		//vertices = std::move(loadedMesh.vertices);
+		//indices = std::move(loadedMesh.indices);
+
 		Assimp::Importer importer;
 
 		unsigned int flags = aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_FlipUVs | aiProcess_PreTransformVertices | aiProcess_SortByPType | aiProcess_CalcTangentSpace;
@@ -1585,35 +1591,41 @@ private:
 			throw std::runtime_error("failed to load model");
 		}
 
-		aiMesh* mesh = scene->mMeshes[0];
+		std::vector<Mesh> meshes;
+		for (uint32_t i = 0; i < scene->mNumMeshes; i++) {
+			aiMesh* mesh = scene->mMeshes[i];
+			Mesh retMesh;
 
-		std::unordered_map<Vertex, uint32_t> uniqueVertices {};
-		for (uint32_t j = 0; j < mesh->mNumFaces; j++) {
-			for (uint32_t k = 0; k < mesh->mFaces[j].mNumIndices; k++) {
-				Vertex vertex {};
-				uint32_t index = mesh->mFaces[j].mIndices[k];
+			std::unordered_map<Vertex, uint32_t> uniqueVertices {};
+			for (uint32_t j = 0; j < mesh->mNumFaces; j++) {
+				for (uint32_t k = 0; k < mesh->mFaces[j].mNumIndices; k++) {
+					Vertex vertex {};
+					uint32_t index = mesh->mFaces[j].mIndices[k];
 
-				vertex.pos = glm::vec3(mesh->mVertices[index].x, mesh->mVertices[index].y, mesh->mVertices[index].z);
+					vertex.pos = glm::vec3(mesh->mVertices[index].x, mesh->mVertices[index].y, mesh->mVertices[index].z);
 
-				if (mesh->GetNumColorChannels() != 0) {
-					vertex.color = glm::vec3(mesh->mColors[index]->r, mesh->mColors[index]->g, mesh->mColors[index]->b);
-				} else {
-					vertex.color = glm::vec3(1.0f, 1.0f, 1.0f);
+					if (mesh->GetNumColorChannels() != 0) {
+						vertex.color = glm::vec3(mesh->mColors[index]->r, mesh->mColors[index]->g, mesh->mColors[index]->b);
+					} else {
+						vertex.color = glm::vec3(1.0f, 1.0f, 1.0f);
+					}
+
+					if (mesh->GetNumUVChannels() != 0) {
+						vertex.texCoord = glm::vec2(mesh->mTextureCoords[0][index].x, mesh->mTextureCoords[0][index].y);
+					} else {
+						vertex.texCoord = glm::vec2(0.0f, 0.0f);
+					}
+
+					if (uniqueVertices.count(vertex) == 0) {
+						uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+						vertices.push_back(vertex);
+					}
+
+					indices.push_back(uniqueVertices[vertex]);
 				}
-
-				if (mesh->GetNumUVChannels() != 0) {
-					vertex.texCoord = glm::vec2(mesh->mTextureCoords[0][index].x, mesh->mTextureCoords[0][index].y);
-				} else {
-					vertex.texCoord = glm::vec2(0.0f, 0.0f);
-				}
-
-				if (uniqueVertices.count(vertex) == 0) {
-					uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-					vertices.push_back(vertex);
-				}
-
-				indices.push_back(uniqueVertices[vertex]);
 			}
+
+			meshes.push_back(retMesh);
 		}
 	}
 #pragma endregion

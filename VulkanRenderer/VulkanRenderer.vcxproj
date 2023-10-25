@@ -189,8 +189,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Mesh.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Mesh.h" />
     <ClInclude Include="Stopwatch.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="UniformBufferObject.h" />
