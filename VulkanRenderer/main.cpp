@@ -40,6 +40,8 @@
 #include "Mesh.h"
 #include "Texture.h"
 #include "Stopwatch.h"
+#include "Camera.h"
+#include "Cursor.h"
 #include "UniformBuffer.h"
 #include "UniformBufferObject.h"
 #include "LightSource.h"
@@ -129,6 +131,10 @@ private:
 
 	Texture depthTex;
 
+	Camera camera { { 0, 0, 2 }, { -90, 0 } };
+	Cursor cursor;
+	glm::vec2 lastMousePosition { 0, 0 };
+
 	bool framebufferResized = false;
 
 	uint32_t currentFrame = 0;
@@ -147,6 +153,7 @@ private:
 		window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
 		glfwSetWindowUserPointer(window, this);
 		glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
+		glfwSetCursorPosCallback(window, &cursor.SetMousePosition);
 	}
 
 	void initVulkan()
@@ -1783,19 +1790,56 @@ private:
 	void mainLoop()
 	{
 		Stopwatch sw;
+		float delta = 0;
 		uint8_t maxWidth = 1;
 
 		while (!glfwWindowShouldClose(window)) {
 			sw.Start();
 
 			glfwPollEvents();
+			Update(delta);
 			drawFrame();
 
-			std::string fps = std::to_string((int)(1 / sw.Current()));
+			delta = (float)sw.Current();
+			std::string fps = std::to_string((int)(1 / delta));
 			std::cout << "fps: " <<  fps << '\r';
 		}
 
 		vkDeviceWaitIdle(device);
+	}
+
+	void Update(float delta)
+	{
+		glm::vec3 move { 0, 0, 0 };
+		float moveSpeed = 2;
+		float rotateSpeed = 0.5f;
+
+		if (glfwGetKey(window, GLFW_KEY_SPACE)) {
+			move.y += moveSpeed * delta;
+		}
+		if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL)) {
+			move.y -= moveSpeed * delta;
+		}
+		if (glfwGetKey(window, GLFW_KEY_D)) {
+			move.x += moveSpeed * delta;
+		}
+		if (glfwGetKey(window, GLFW_KEY_A)) {
+			move.x -= moveSpeed * delta;
+		}
+		if (glfwGetKey(window, GLFW_KEY_W)) {
+			move.z += moveSpeed * delta;
+		}
+		if (glfwGetKey(window, GLFW_KEY_S)) {
+			move.z -= moveSpeed * delta;
+		}
+
+		camera.Move(move);
+
+		if (glfwGetMouseButton(window, 1)) {
+			camera.Rotate((cursor.GetMousePosition() - lastMousePosition) * rotateSpeed);
+		}
+
+		lastMousePosition = cursor.GetMousePosition();
 	}
 
 	void drawFrame()
@@ -1864,8 +1908,10 @@ private:
 	{
 		UniformBufferObject ubo{};
 		ubo.model = glm::rotate(glm::mat4(1.0f), (float)programWatch.Current() * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-		ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-		ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
+		//ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+		//ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
+		ubo.view = camera.GetViewMatrix();
+		ubo.proj = camera.GetProjectionMatrix((float)WIDTH, (float)HEIGHT);
 		ubo.proj[1][1] *= -1;
 		ubo.frameSize = glm::vec2(swapChainExtent.width, swapChainExtent.height);
 
