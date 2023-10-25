@@ -126,12 +126,7 @@ private:
 	std::vector<VkSemaphore> renderFinishedSemaphores;
 	std::vector<VkFence> inFlightFences;
 
-	std::vector<Vertex> vertices;
-	std::vector<uint32_t> indices;
-	VkBuffer vertexBuffer;
-	VkDeviceMemory vertexBufferMemory;
-	VkBuffer indexBuffer;
-	VkDeviceMemory indexBufferMemory;
+	std::vector<Mesh> meshes;
 
 	std::vector<VkBuffer> uniformBuffers;
 	std::vector<VkDeviceMemory> uniformBuffersMemory;
@@ -187,8 +182,8 @@ private:
 		createTextureImageView();
 		createTextureSampler();
 		loadModel();
-		createVertexBuffer();
-		createIndexBuffer();
+		//createVertexBuffer();
+		//createIndexBuffer();
 		createUniformBuffers();
 		createDescriptorPool();
 		createDescriptorSets();
@@ -1045,13 +1040,15 @@ private:
 			scissor.extent = swapChainExtent;
 			vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-			VkBuffer vertexBuffers[] = { vertexBuffer };
-			VkDeviceSize offsets[] = { 0 };
-			vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-			vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
+			for (auto& mesh : meshes) {
+				VkBuffer vertexBuffers[] = { mesh.vertexBuffer };
+				VkDeviceSize offsets[] = { 0 };
+				vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+				vkCmdBindIndexBuffer(commandBuffer, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-			vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+				vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(mesh.indices.size()), 1, 0, 0, 0);
+			}
 		}
 		vkCmdEndRenderPass(commandBuffer);
 
@@ -1088,9 +1085,9 @@ private:
 #pragma endregion
 
 #pragma region Buffers
-	void createVertexBuffer()
+	void createVertexBuffer(Mesh& mesh)
 	{
-		VkDeviceSize size = sizeof(vertices[0]) * vertices.size();
+		VkDeviceSize size = sizeof(mesh.vertices[0]) * mesh.vertices.size();
 
 		VkBuffer stagingBuffer;
 		VkDeviceMemory stagingBufferMemory;
@@ -1101,22 +1098,22 @@ private:
 
 		void* data;
 		vkMapMemory(device, stagingBufferMemory, 0, size, 0, &data);
-		memcpy(data, vertices.data(), (size_t)size);
+		memcpy(data, mesh.vertices.data(), (size_t)size);
 		vkUnmapMemory(device, stagingBufferMemory);
 
 		usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 		properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		createBuffer(size, usage, properties, vertexBuffer, vertexBufferMemory);
+		createBuffer(size, usage, properties, mesh.vertexBuffer, mesh.vertexBufferMemory);
 
-		copyBuffer(stagingBuffer, vertexBuffer, size);
+		copyBuffer(stagingBuffer, mesh.vertexBuffer, size);
 
 		vkDestroyBuffer(device, stagingBuffer, nullptr);
 		vkFreeMemory(device, stagingBufferMemory, nullptr);
 	}
 
-	void createIndexBuffer()
+	void createIndexBuffer(Mesh& mesh)
 	{
-		VkDeviceSize size = sizeof(indices[0]) * indices.size();
+		VkDeviceSize size = sizeof(mesh.indices[0]) * mesh.indices.size();
 
 		VkBuffer stagingBuffer;
 		VkDeviceMemory stagingBufferMemory;
@@ -1127,14 +1124,14 @@ private:
 
 		void* data;
 		vkMapMemory(device, stagingBufferMemory, 0, size, 0, &data);
-		memcpy(data, indices.data(), (size_t)size);
+		memcpy(data, mesh.indices.data(), (size_t)size);
 		vkUnmapMemory(device, stagingBufferMemory);
 
 		usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
 		properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		createBuffer(size, usage, properties, indexBuffer, indexBufferMemory);
+		createBuffer(size, usage, properties, mesh.indexBuffer, mesh.indexBufferMemory);
 
-		copyBuffer(stagingBuffer, indexBuffer, size);
+		copyBuffer(stagingBuffer, mesh.indexBuffer, size);
 
 		vkDestroyBuffer(device, stagingBuffer, nullptr);
 		vkFreeMemory(device, stagingBufferMemory, nullptr);
@@ -1577,11 +1574,6 @@ private:
 #pragma region Models
 	void loadModel()
 	{
-		//Mesh loadedMesh = LoadModel(MODEL_PATH);
-		//
-		//vertices = std::move(loadedMesh.vertices);
-		//indices = std::move(loadedMesh.indices);
-
 		Assimp::Importer importer;
 
 		unsigned int flags = aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_FlipUVs | aiProcess_PreTransformVertices | aiProcess_SortByPType | aiProcess_CalcTangentSpace;
@@ -1591,7 +1583,6 @@ private:
 			throw std::runtime_error("failed to load model");
 		}
 
-		std::vector<Mesh> meshes;
 		for (uint32_t i = 0; i < scene->mNumMeshes; i++) {
 			aiMesh* mesh = scene->mMeshes[i];
 			Mesh retMesh;
@@ -1617,15 +1608,20 @@ private:
 					}
 
 					if (uniqueVertices.count(vertex) == 0) {
-						uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-						vertices.push_back(vertex);
+						uniqueVertices[vertex] = static_cast<uint32_t>(retMesh.vertices.size());
+						retMesh.vertices.push_back(vertex);
 					}
 
-					indices.push_back(uniqueVertices[vertex]);
+					retMesh.indices.push_back(uniqueVertices[vertex]);
 				}
 			}
 
 			meshes.push_back(retMesh);
+		}
+
+		for (auto& mesh : meshes) {
+			createVertexBuffer(mesh);
+			createIndexBuffer(mesh);
 		}
 	}
 #pragma endregion
@@ -1749,11 +1745,13 @@ private:
 			vkDestroyFence(device, inFlightFences[i], nullptr);
 		}
 
-		vkDestroyBuffer(device, vertexBuffer, nullptr);
-		vkFreeMemory(device, vertexBufferMemory, nullptr);
+		for (auto& mesh : meshes) {
+			vkDestroyBuffer(device, mesh.vertexBuffer, nullptr);
+			vkFreeMemory(device, mesh.vertexBufferMemory, nullptr);
 
-		vkDestroyBuffer(device, indexBuffer, nullptr);
-		vkFreeMemory(device, indexBufferMemory, nullptr);
+			vkDestroyBuffer(device, mesh.indexBuffer, nullptr);
+			vkFreeMemory(device, mesh.indexBufferMemory, nullptr);
+		}
 
 		vkDestroyCommandPool(device, commandPool, nullptr);
 
