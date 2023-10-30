@@ -13,7 +13,8 @@ const std::string ROUGHNESS_TEXTURE_PATH = "textures/MonkeyBrain_Roughness.png";
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
 const std::vector<const char*> validationLayers = {
-	"VK_LAYER_KHRONOS_validation"
+	"VK_LAYER_KHRONOS_validation",
+	"VK_LAYER_LUNARG_monitor"
 };
 
 #ifdef NDEBUG

@@ -123,7 +123,6 @@ private:
 	std::vector<VkDescriptorSet> descriptorSets;
 
 	VkDescriptorPool imGuiDescriptorPool;
-	std::vector<VkDescriptorSet> imGuiDescriptorSets;
 
 	Texture baseColorTex;
 	Texture emissiveTex;
@@ -2002,7 +2001,7 @@ private:
 
 	void cleanup()
 	{
-		ImGui_ImplGlfw_Shutdown();
+		ImGui_ImplVulkan_Shutdown();
 		ImGui_ImplGlfw_Shutdown();
 		ImGui::DestroyContext();
 
@@ -2021,6 +2020,7 @@ private:
 		lightUniformBuffer.Cleanup(device, MAX_FRAMES_IN_FLIGHT);
 
 		vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+		vkDestroyDescriptorPool(device, imGuiDescriptorPool, nullptr);
 
 		vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
