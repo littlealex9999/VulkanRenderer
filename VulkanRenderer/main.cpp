@@ -14,13 +14,14 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
 
-//#define TINYOBJLOADER_IMPLEMENTATION
-//#include <tinyobjloader/tiny_obj_loader.h>
-
 #include <assimp/scene.h>
 #include <assimp/cimport.h>
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
+
+#include <imgui/imgui.h>
+#include <imgui/backends/imgui_impl_glfw.h>
+#include <imgui/backends/imgui_impl_vulkan.h>
 
 #include <iostream>
 #include <stdexcept>
@@ -121,6 +122,9 @@ private:
 	VkDescriptorPool descriptorPool;
 	std::vector<VkDescriptorSet> descriptorSets;
 
+	VkDescriptorPool imGuiDescriptorPool;
+	std::vector<VkDescriptorSet> imGuiDescriptorSets;
+
 	Texture baseColorTex;
 	Texture emissiveTex;
 	Texture heightTex;
@@ -175,10 +179,11 @@ private:
 		createTextureSampler();
 		loadModel();
 		createUniformBuffers();
-		createDescriptorPool();
+		createDescriptorPools();
 		createDescriptorSets();
 		createCommandBuffers();
 		createSyncObjects();
+		initImGui();
 	}
 
 #pragma region Instance setup
@@ -1056,6 +1061,9 @@ private:
 		renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
 		renderPassInfo.pClearValues = clearValues.data();
 
+		createImGuiMenus();
+		ImGui::Render();
+
 		vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 		{ // arbitrary scope for organisation
 			vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
@@ -1083,6 +1091,8 @@ private:
 
 				vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(mesh.indices.size()), 1, 0, 0, 0);
 			}
+
+			ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
 		}
 		vkCmdEndRenderPass(commandBuffer);
 
@@ -1190,7 +1200,7 @@ private:
 		}
 	}
 
-	void createDescriptorPool()
+	void createDescriptorPools()
 	{
 		std::array<VkDescriptorPoolSize, 8> poolSizes{};
 		poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -1217,6 +1227,21 @@ private:
 		poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
 		if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create descriptor pool");
+		}
+
+		std::array<VkDescriptorPoolSize, 1> imGuiPoolSizes{};
+		imGuiPoolSizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		imGuiPoolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+		VkDescriptorPoolCreateInfo imGuiPoolInfo{};
+		imGuiPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		imGuiPoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+		imGuiPoolInfo.poolSizeCount = static_cast<uint32_t>(imGuiPoolSizes.size());
+		imGuiPoolInfo.pPoolSizes = imGuiPoolSizes.data();
+		imGuiPoolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+		if (vkCreateDescriptorPool(device, &imGuiPoolInfo, nullptr, &imGuiDescriptorPool) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create descriptor pool");
 		}
 	}
@@ -1784,6 +1809,46 @@ private:
 		}
 	}
 #pragma endregion
+
+#pragma region ImGui
+	void initImGui()
+	{
+		ImGui::CreateContext();
+		ImGui::StyleColorsDark();
+
+		ImGui_ImplGlfw_InitForVulkan(window, true);
+
+		ImGui_ImplVulkan_InitInfo initInfo{};
+		initInfo.Instance = instance;
+		initInfo.PhysicalDevice = physicalDevice;
+		initInfo.Device = device;
+		initInfo.QueueFamily = 0;
+		initInfo.Queue = presentQueue;
+		initInfo.PipelineCache = nullptr;
+		initInfo.DescriptorPool = imGuiDescriptorPool;
+		initInfo.Subpass = 0;
+		initInfo.MinImageCount = MAX_FRAMES_IN_FLIGHT;
+		initInfo.ImageCount = MAX_FRAMES_IN_FLIGHT;
+		initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+		initInfo.Allocator = nullptr;
+		initInfo.CheckVkResultFn = nullptr;
+
+		ImGui_ImplVulkan_Init(&initInfo, renderPass);
+
+		// Upload fonts
+
+		VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+		VkCommandBufferBeginInfo beginInfo{};
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+		ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
+
+		endSingleTimeCommands(commandBuffer);
+
+		ImGui_ImplVulkan_DestroyFontUploadObjects();
+	}
+#pragma endregion
 #pragma endregion
 
 #pragma region Main loop
@@ -1908,8 +1973,6 @@ private:
 	{
 		UniformBufferObject ubo{};
 		ubo.model = glm::rotate(glm::mat4(1.0f), (float)programWatch.Current() * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-		//ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-		//ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
 		ubo.view = camera.GetViewMatrix();
 		ubo.proj = camera.GetProjectionMatrix((float)WIDTH, (float)HEIGHT);
 		ubo.proj[1][1] *= -1;
@@ -1922,10 +1985,27 @@ private:
 
 		memcpy(lightUniformBuffer.uniformBuffersMapped[currentImage], &light, sizeof(light));
 	}
+
+	void createImGuiMenus()
+	{
+		ImGui_ImplVulkan_NewFrame();
+		ImGui_ImplGlfw_NewFrame();
+		ImGui::NewFrame();
+
+		ImGui::Begin("Henlo, wurld.");
+
+		ImGui::Text("Default text");
+
+		ImGui::End();
+	}
 #pragma endregion
 
 	void cleanup()
 	{
+		ImGui_ImplGlfw_Shutdown();
+		ImGui_ImplGlfw_Shutdown();
+		ImGui::DestroyContext();
+
 		cleanupSwapChain();
 
 		vkDestroySampler(device, textureSampler, nullptr);

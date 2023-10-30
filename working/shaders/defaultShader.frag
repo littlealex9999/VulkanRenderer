@@ -23,6 +23,7 @@ layout(location = 0) out vec4 outColor;
 void main()
 {
 	vec3 diffuse = texture(baseColorTex, fragTexCoord).xyz;
+	vec3 emissive = texture(emissiveTex, fragTexCoord).xyz;
 	vec3 normalCalc = TBN * (texture(normalTex, fragTexCoord).xyz * 2 - 1);
 
 	float roughness = texture(roughnessTex, fragTexCoord).x;
@@ -79,7 +80,7 @@ void main()
 
 	CookTorranceOut += max((D*G*F) / (NdE * pi), 0.0f);
 
-	outColor = vec4(diffuse * (OrenNayarOut + CookTorranceOut), 1);
+	outColor = vec4(diffuse * (OrenNayarOut + CookTorranceOut) + emissive, 1);
 	//outColor = vec4(viewerDir, 1);
 	//outColor = texture(normalTex, fragTexCoord);
 }
