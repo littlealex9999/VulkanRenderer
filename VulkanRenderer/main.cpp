@@ -146,6 +146,11 @@ private:
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME
 	};
 
+	glm::vec3 modelPosition{};
+	glm::vec3 modelRotation{};
+	glm::vec3 modelScale{ 1.0f, 1.0f, 1.0f };
+	LightSource mainLight{ { 1.0f, 1.0f, 1.0f } };
+
 #pragma region Init
 	void initWindow()
 	{
@@ -694,6 +699,7 @@ private:
 		cleanupSwapChain();
 		createSwapChain();
 		createImageViews();
+		createDepthResources();
 		createFramebuffers();
 	}
 #pragma endregion
@@ -1971,18 +1977,19 @@ private:
 	void updateUniformBuffer(uint32_t currentImage)
 	{
 		UniformBufferObject ubo{};
-		ubo.model = glm::rotate(glm::mat4(1.0f), (float)programWatch.Current() * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+		ubo.model = glm::rotate(glm::mat4(1.0f), modelRotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
+		ubo.model *= glm::rotate(glm::mat4(1.0f), modelRotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+		ubo.model *= glm::rotate(glm::mat4(1.0f), modelRotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
+		ubo.model *= glm::scale(glm::mat4(1.0f), modelScale);
+		ubo.model *= glm::translate(glm::mat4(1.0f), modelPosition);
+
 		ubo.view = camera.GetViewMatrix();
-		ubo.proj = camera.GetProjectionMatrix((float)WIDTH, (float)HEIGHT);
+		ubo.proj = camera.GetProjectionMatrix((float)swapChainExtent.width, (float)swapChainExtent.height);
 		ubo.proj[1][1] *= -1;
 		ubo.frameSize = glm::vec2(swapChainExtent.width, swapChainExtent.height);
 
 		memcpy(uniformBufferObject.uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
-
-		LightSource light {};
-		light.direction = glm::vec3(1.0f, 1.0f, 1.0f);
-
-		memcpy(lightUniformBuffer.uniformBuffersMapped[currentImage], &light, sizeof(light));
+		memcpy(lightUniformBuffer.uniformBuffersMapped[currentImage], &mainLight, sizeof(mainLight));
 	}
 
 	void createImGuiMenus()
@@ -1991,9 +1998,12 @@ private:
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
 
-		ImGui::Begin("Henlo, wurld.");
+		ImGui::Begin("Object");
 
-		ImGui::Text("Default text");
+		ImGui::DragFloat3("Model Position", (float*)&modelPosition, 0.1f);
+		ImGui::DragFloat3("Model Rotation", (float*)&modelRotation, 0.1f);
+		ImGui::DragFloat3("Model Scale", (float*)&modelScale, 0.1f);
+		ImGui::DragFloat3("Light Direction", (float*)&mainLight.direction, 0.1f);
 
 		ImGui::End();
 	}
