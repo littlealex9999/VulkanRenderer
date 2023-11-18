@@ -7,6 +7,7 @@ public:
 	VkImage image;
 	VkDeviceMemory imageMemory;
 	VkImageView imageView;
+	VkFormat format;
 
 	void Cleanup(VkDevice device);
 };

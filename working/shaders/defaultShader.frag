@@ -80,7 +80,7 @@ void main()
 
 	CookTorranceOut += max((D*G*F) / (NdE * pi), 0.0f);
 
-	outColor = vec4(diffuse * (OrenNayarOut + CookTorranceOut) + emissive, 1);
-	//outColor = vec4(normalCalc, 1);
+	//outColor = vec4(diffuse * (OrenNayarOut + CookTorranceOut) + emissive, 1);
+	outColor = vec4(normalCalc, 1);
 	//outColor = texture(normalTex, fragTexCoord);
 }
