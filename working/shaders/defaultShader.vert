@@ -10,8 +10,9 @@ layout(binding = 0) uniform UniformBufferObject {
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inColor;
 layout(location = 2) in vec3 inNormal;
-layout(location = 3) in vec3 inTangent;
-layout(location = 4) in vec2 inTexCoord;
+layout(location = 3) in vec3 inBitangent;
+layout(location = 4) in vec3 inTangent;
+layout(location = 5) in vec2 inTexCoord;
 
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec3 fragNormal;
@@ -29,7 +30,14 @@ void main()
 	fragTexCoord = inTexCoord;
 	frameSize = mvp.frameSize;
 
-	TBN[0] = vec3(-inTangent);
-	TBN[1] = vec3(cross(fragNormal, inTangent));
-	TBN[2] = vec3(fragNormal);
+	mat3 M = mat3(mvp.model);
+	vec3 T = normalize(M * inTangent);
+	vec3 N = normalize(M * inNormal);
+	T = normalize(T - dot(T, N) * N);
+	vec3 B = cross(N, T);
+	TBN = mat3(T, B, N);
+
+	//TBN[0] = vec3(fragNormal);
+	//TBN[1] = vec3(inBitangent);
+	//TBN[2] = vec3(-inTangent);
 }

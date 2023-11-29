@@ -1787,8 +1787,10 @@ private:
 					}
 
 					if (mesh->HasTangentsAndBitangents()) {
+						vertex.bitangent = glm::vec3(mesh->mBitangents[index].x, mesh->mBitangents[index].y, mesh->mBitangents[index].z);
 						vertex.tangent = glm::vec3(mesh->mTangents[index].x, mesh->mTangents[index].y, mesh->mTangents[index].z);
 					} else {
+						vertex.bitangent = glm::vec3(0.0f, 0.0f, 0.0f);
 						vertex.tangent = glm::vec3(0.0f, 0.0f, 0.0f);
 					}
 

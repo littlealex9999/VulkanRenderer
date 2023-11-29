@@ -11,6 +11,7 @@ struct Vertex
 	glm::vec3 pos;
 	glm::vec3 color;
 	glm::vec3 normal;
+	glm::vec3 bitangent;
 	glm::vec3 tangent;
 	glm::vec2 texCoord;
 
@@ -24,9 +25,9 @@ struct Vertex
 		return bindingDescription;
 	}
 
-	static std::array<VkVertexInputAttributeDescription, 5> getAttributeDescriptions()
+	static std::array<VkVertexInputAttributeDescription, 6> getAttributeDescriptions()
 	{
-		std::array<VkVertexInputAttributeDescription, 5> attributeDescriptions;
+		std::array<VkVertexInputAttributeDescription, 6> attributeDescriptions;
 		attributeDescriptions[0].binding = 0;
 		attributeDescriptions[0].location = 0;
 		attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
@@ -45,19 +46,30 @@ struct Vertex
 		attributeDescriptions[3].binding = 0;
 		attributeDescriptions[3].location = 3;
 		attributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attributeDescriptions[3].offset = offsetof(Vertex, tangent);
+		attributeDescriptions[3].offset = offsetof(Vertex, bitangent);
 
 		attributeDescriptions[4].binding = 0;
 		attributeDescriptions[4].location = 4;
-		attributeDescriptions[4].format = VK_FORMAT_R32G32_SFLOAT;
-		attributeDescriptions[4].offset = offsetof(Vertex, texCoord);
+		attributeDescriptions[4].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[4].offset = offsetof(Vertex, tangent);
+
+		attributeDescriptions[5].binding = 0;
+		attributeDescriptions[5].location = 5;
+		attributeDescriptions[5].format = VK_FORMAT_R32G32_SFLOAT;
+		attributeDescriptions[5].offset = offsetof(Vertex, texCoord);
 
 		return attributeDescriptions;
 	}
 
 	bool operator==(const Vertex& other) const
 	{
-		return pos == other.pos && color == other.color && normal == other.normal && tangent == other.tangent && texCoord == other.texCoord;
+		return 
+			pos == other.pos && 
+			color == other.color && 
+			normal == other.normal && 
+			bitangent == other.bitangent &&
+			tangent == other.tangent && 
+			texCoord == other.texCoord;
 	}
 };
 

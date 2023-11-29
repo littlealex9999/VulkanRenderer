@@ -24,7 +24,7 @@ void main()
 {
 	vec3 diffuse = texture(baseColorTex, fragTexCoord).xyz;
 	vec3 emissive = texture(emissiveTex, fragTexCoord).xyz;
-	vec3 normalCalc = TBN * (texture(normalTex, fragTexCoord).xyz * 2 - 1);
+	vec3 normalCalc = normalize(TBN * (texture(normalTex, fragTexCoord).xyz * 2 - 1));
 
 	float roughness = texture(roughnessTex, fragTexCoord).x;
 	vec3 viewerDir = normalize(vec3(-(gl_FragCoord.xy - frameSize / 2) / (frameSize.x / 2), cos(45)));
